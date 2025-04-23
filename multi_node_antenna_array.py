@@ -144,20 +144,21 @@ for i in range(100):
     #     plt.show()
     #print(interval[i])
     #print((interval[i]/16000000*1000000)*slope)
-    #diff_diff = (packet2_phase_diff_compensate - interval[i]/16*slope) - packet1_phase_diff_compensate
+    phase_change = interval[i]/16*slope%(2*np.pi)
     diff_diff = (packet2_phase_diff_compensate) - packet1_phase_diff_compensate
+    #diff_diff = (packet2_phase_diff_compensate) - packet1_phase_diff_compensate
 
     diff_diff_mean = np.mean(diff_diff)
-    while (diff_diff_mean > 2*np.pi):
-        diff_diff_mean = diff_diff_mean - 2*np.pi
-
-    while (diff_diff_mean < -2*np.pi):
-        diff_diff_mean = diff_diff_mean + 2*np.pi
-
     if diff_diff_mean > np.pi:
         diff_diff_mean = diff_diff_mean - 2*np.pi
     elif diff_diff_mean < -np.pi:
         diff_diff_mean = diff_diff_mean + 2*np.pi
+
+    phase_diff = (diff_diff_mean + phase_change)%(2*np.pi)
+    if phase_diff > np.pi:
+        phase_diff = phase_diff - 2 * np.pi
+    if phase_diff < -np.pi:
+        phase_diff = phase_diff + 2 * np.pi
 
     # if diff_diff_mean < 0:
     #     fig, axs = plt.subplots(2, 1)
@@ -184,7 +185,7 @@ for i in range(100):
     # plt.plot(diff_diff)
     # plt.show()
 
-    diff_list.append(diff_diff_mean)
+    diff_list.append(phase_diff)
         
 # for i in range(len(diff_list)):
 #     if diff_list[i] > np.pi:

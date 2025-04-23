@@ -50,16 +50,20 @@ axs[0].plot(t, base_band_signal_I[sample_indices], marker='.')
 axs[0].plot(t, base_band_signal_Q[sample_indices], marker='.')
 axs[0].set_xlabel('time (us)')
 axs[0].set_ylabel('amplitude')
+axs[0].set_title('base band signal')
 
 axs[1].plot(t, base_band_recover_signal_I_lowpass[sample_indices], marker='.')
 axs[1].plot(t, base_band_recover_signal_Q_lowpass[sample_indices], marker='.')
 axs[1].set_xlabel('time (us)')
 axs[1].set_ylabel('amplitude')
+axs[1].set_title('received base band signal')
 
-axs[2].plot(t, np.arctan2(base_band_signal_Q[sample_indices], base_band_signal_I[sample_indices]), marker='.')
-axs[2].plot(t, np.arctan2(base_band_recover_signal_Q_lowpass[sample_indices], base_band_recover_signal_I_lowpass[sample_indices]), marker='.')
+axs[2].plot(t, np.arctan2(base_band_signal_Q[sample_indices], base_band_signal_I[sample_indices]), marker='.', label='base band signal')
+axs[2].plot(t, np.arctan2(base_band_recover_signal_Q_lowpass[sample_indices], base_band_recover_signal_I_lowpass[sample_indices]), marker='.', label='received base band signal')
 axs[2].set_xlabel('time (us)')
 axs[2].set_ylabel('phase')
+axs[2].set_title('transmitted and received base band signal phase')
+plt.tight_layout()
 plt.show()
 
 def up_conversion(base_band_signal_I, base_band_signal_Q, fc, high_t, initial_phase):

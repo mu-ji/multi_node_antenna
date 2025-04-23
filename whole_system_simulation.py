@@ -16,7 +16,7 @@ antenna_interval = 0.06
 rx1_position = (-antenna_interval/2, 0)
 rx2_position = (antenna_interval/2, 0)
 tx1_position = (0, 1)
-tx2_position = (0.2, 1)
+tx2_position = (-0.8, 1)
 
 initial_phase_tx1 = 0.5
 initial_phase_tx2 = 0.2
@@ -107,6 +107,7 @@ def cal_packet_phase_diff(rx1_packet_I, rx1_packet_Q, rx2_packet_I, rx2_packet_Q
     return phase_diff
 
 delta_t = 0.00005
+delta_t_error_rate = 0.001
 diff_diff_list = []
 while frame_sqn < 100:
     print('frame_sqn:', frame_sqn)
@@ -155,13 +156,14 @@ while frame_sqn < 100:
     y = 5 * np.sin(angle)
 
     plt.figure()
-    plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r')
-    plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r')
-    plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y')
-    plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b')
+    plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r', label = 'RX1')
+    plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r', label = 'RX2')
+    plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y', label = 'TX1')
+    plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b', label = 'Target')
     plt.plot([0, x], [0, y])
     plt.xlim(-1.2, 1.2)
     #plt.ylim(-1.2, 1.2)
+    plt.legend()
     plt.show()
 
     diff_diff = packet2_phase_diff - packet1_phase_diff
@@ -178,28 +180,35 @@ while frame_sqn < 100:
     diff_diff_mean = np.mean(diff_diff[1:])
     diff_diff_list.append(diff_diff_mean)
 
-    phase_change = (2 * np.pi * fc*(1+rx1_drift) * delta_t) - (2 * np.pi * fc*(1+rx2_drift) * delta_t) 
+    phase_change = (2 * np.pi * fc*(1+rx1_drift) * delta_t*(1 + delta_t_error_rate)) - (2 * np.pi * fc*(1+rx2_drift) * delta_t*(1 + delta_t_error_rate)) 
     phase_change_1 = phase_change%(2*np.pi)
 
     if phase_change_1 > np.pi:
         phase_change_1 = phase_change_1 - 2 * np.pi
     if phase_change_1 < -np.pi:
         phase_change_1 = phase_change_1 + 2 * np.pi
-
-    angle = np.arccos((diff_diff_mean + phase_change_1)%(2*np.pi)/(np.pi*2)*0.125/antenna_interval)
+    print(diff_diff_mean, phase_change_1)
+    print((diff_diff_mean + phase_change_1)%(2*np.pi))
+    phase_diff = (diff_diff_mean + phase_change_1)%(2*np.pi)
+    if phase_diff > np.pi:
+        phase_diff = phase_diff - 2 * np.pi
+    if phase_diff < -np.pi:
+        phase_diff = phase_diff + 2 * np.pi
+    angle = np.arccos(phase_diff/(np.pi*2)*0.125/antenna_interval)
 
     x = 5 * np.cos(angle)
     y = 5 * np.sin(angle)
 
     plt.figure()
-    plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r')
-    plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r')
-    plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y')
-    plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b')
+    plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r', label='RX1')
+    plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r', label='RX2')
+    plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y', label='TX1')
+    plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b', label='Target')
     plt.plot([0, x], [0, y])
     plt.xlim(-1.2, 1.2)
     plt.title('Amuna')
     #plt.ylim(-1.2, 1.2)
+    plt.legend()
     plt.show()
 
     frame_sqn = frame_sqn + 1
