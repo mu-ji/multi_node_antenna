@@ -30,7 +30,8 @@ def thread(ser, id):
         'packet_1_I_data': [],
         'packet_1_Q_data': [],
         'packet_2_I_data': [],
-        'packet_2_Q_data': []
+        'packet_2_Q_data': [],
+        'interval': []
     }
     rawFrame = []
     num_samples = 88
@@ -38,13 +39,14 @@ def thread(ser, id):
     while cte_number < 100:
         byte  = ser.read(1)        
         rawFrame += byte
-
         if rawFrame[-3:]==[255, 255, 255]:
-            if len(rawFrame) == 4*num_samples*2+3:
+            if len(rawFrame) == 4*num_samples*2+7:
                 received_data_1 = rawFrame[:4*num_samples]
                 received_data_2 = rawFrame[4*num_samples:4*num_samples*2]
                 num_samples = 88
                 
+                interval = struct.unpack('>hh', bytes(rawFrame[4*num_samples*2:-3]))[1]
+
                 packet_1_I_data = np.zeros(num_samples, dtype=np.int16)
                 packet_1_Q_data = np.zeros(num_samples, dtype=np.int16)
                 packet_2_I_data = np.zeros(num_samples, dtype=np.int16)
@@ -79,12 +81,13 @@ def thread(ser, id):
                 all_data['packet_1_Q_data'].append(packet_1_Q_data)
                 all_data['packet_2_I_data'].append(packet_2_I_data)
                 all_data['packet_2_Q_data'].append(packet_2_Q_data)
+                all_data['interval'].append(interval)
                 cte_number += 1
                 print('{}'.format(id), cte_number)
                 #np.savez('data_{}.npz'.format(id), **all_data)
                 rawFrame = []
     #np.savez('100_data_{}.npz'.format(id), **all_data)
-    np.savez('100_data_{}.npz'.format(id), **all_data)
+    np.savez('100_data_10_degree{}.npz'.format(id), **all_data)
         
             
 
