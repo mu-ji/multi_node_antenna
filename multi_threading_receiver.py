@@ -45,7 +45,7 @@ def thread(ser, id):
                 received_data_2 = rawFrame[4*num_samples:4*num_samples*2]
                 num_samples = 88
                 
-                interval = struct.unpack('>hh', bytes(rawFrame[4*num_samples*2:-3]))[1]
+                interval = struct.unpack('>HH', bytes(rawFrame[4*num_samples*2:-3]))[1]
 
                 packet_1_I_data = np.zeros(num_samples, dtype=np.int16)
                 packet_1_Q_data = np.zeros(num_samples, dtype=np.int16)
@@ -87,7 +87,7 @@ def thread(ser, id):
                 #np.savez('data_{}.npz'.format(id), **all_data)
                 rawFrame = []
     #np.savez('100_data_{}.npz'.format(id), **all_data)
-    np.savez('100_data_10_degree{}.npz'.format(id), **all_data)
+    np.savez('10_data_10_degree{}.npz'.format(id), **all_data)
         
             
 

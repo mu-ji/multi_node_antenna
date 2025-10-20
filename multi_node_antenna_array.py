@@ -40,8 +40,8 @@ plt.show()
 data1 = np.load('1000_data_1.npz')
 data2 = np.load('1000_data_2.npz')
 
-data1 = np.load('100_data_10_degree1.npz')
-data2 = np.load('100_data_10_degree2.npz')
+data1 = np.load('10_data_10_degree1.npz')
+data2 = np.load('10_data_10_degree2.npz')
 
 rx1_packet1_I = data1['packet_1_I_data']
 rx1_packet1_Q = data1['packet_1_Q_data']
@@ -191,7 +191,7 @@ for i in range(100):
 #     if diff_list[i] > np.pi:
 #         diff_list[i] = diff_list[i] - 2*np.pi
 
-plt.hist(diff_list,100)
+plt.hist(diff_list,10)
 plt.ylabel('count')
 plt.xlabel('two packet phase diff')
 plt.show()
@@ -219,5 +219,7 @@ print(f"第二高斯分布: 均值 = {means[1][0]}, 方差 = {covariances[1][0][
 x1 = means[0][0]/6.28*12.5/6
 x2 = means[1][0]/6.28*12.5/6
 print('x1:', x1, 'x2:', x2)
-print('angle1:', np.arccos(x1)/np.pi*180)
-print('angle2:', np.arccos(x2)/np.pi*180)
+print('angle1:', np.arcsin(x1)/np.pi*180)
+print('angle2:', np.arcsin(x2)/np.pi*180)
+
+print(np.arcsin(1.42/(2*np.pi)*12.5/6)/np.pi*180)

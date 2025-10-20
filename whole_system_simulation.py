@@ -146,7 +146,7 @@ while frame_sqn < 100:
 
     packet1_phase_diff = cal_packet_phase_diff(rx2_packet1_I, rx2_packet1_Q, rx1_packet1_I, rx1_packet1_Q)
     packet2_phase_diff = cal_packet_phase_diff(rx2_packet2_I, rx2_packet2_Q, rx1_packet2_I, rx1_packet2_Q)
-
+    print(packet2_phase_diff)
     plt.figure()
     plt.plot(packet2_phase_diff, marker='.')
     plt.show()
@@ -155,16 +155,16 @@ while frame_sqn < 100:
     x = 5 * np.cos(angle)
     y = 5 * np.sin(angle)
 
-    plt.figure()
-    plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r', label = 'RX1')
-    plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r', label = 'RX2')
-    plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y', label = 'TX1')
-    plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b', label = 'Target')
-    plt.plot([0, x], [0, y])
-    plt.xlim(-1.2, 1.2)
-    #plt.ylim(-1.2, 1.2)
-    plt.legend()
-    plt.show()
+    # plt.figure()
+    # plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r', label = 'RX1')
+    # plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r', label = 'RX2')
+    # plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y', label = 'TX1')
+    # plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b', label = 'Target')
+    # plt.plot([0, x], [0, y])
+    # plt.xlim(-1.2, 1.2)
+    # #plt.ylim(-1.2, 1.2)
+    # plt.legend()
+    # plt.show()
 
     diff_diff = packet2_phase_diff - packet1_phase_diff
     for i in range(len(diff_diff)):
@@ -173,9 +173,9 @@ while frame_sqn < 100:
         if diff_diff[i] < -np.pi:
             diff_diff[i] = diff_diff[i] + 2 * np.pi
     
-    plt.figure()
-    plt.plot(diff_diff, marker='.')
-    plt.show()
+    # plt.figure()
+    # plt.plot(diff_diff, marker='.')
+    # plt.show()
 
     diff_diff_mean = np.mean(diff_diff[1:])
     diff_diff_list.append(diff_diff_mean)
@@ -199,17 +199,17 @@ while frame_sqn < 100:
     x = 5 * np.cos(angle)
     y = 5 * np.sin(angle)
 
-    plt.figure()
-    plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r', label='RX1')
-    plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r', label='RX2')
-    plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y', label='TX1')
-    plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b', label='Target')
-    plt.plot([0, x], [0, y])
-    plt.xlim(-1.2, 1.2)
-    plt.title('Amuna')
-    #plt.ylim(-1.2, 1.2)
-    plt.legend()
-    plt.show()
+    # plt.figure()
+    # plt.scatter(rx1_position[0], rx1_position[1], marker='o', color='r', label='RX1')
+    # plt.scatter(rx2_position[0], rx2_position[1], marker='o', color='r', label='RX2')
+    # plt.scatter(tx1_position[0], tx1_position[1], marker='x', color='y', label='TX1')
+    # plt.scatter(tx2_position[0], tx2_position[1], marker='x', color='b', label='Target')
+    # plt.plot([0, x], [0, y])
+    # plt.xlim(-1.2, 1.2)
+    # plt.title('Amuna')
+    # #plt.ylim(-1.2, 1.2)
+    # plt.legend()
+    # plt.show()
 
     frame_sqn = frame_sqn + 1
 
