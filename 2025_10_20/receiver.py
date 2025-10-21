@@ -8,10 +8,151 @@ import threading
 from collections import defaultdict, deque
 import time
 
+from scipy import stats
+import itertools
+
 ser1 = serial.Serial('COM14', 115200)
 ser2 = serial.Serial('COM16', 115200)
 
 SPEED_OF_LIGHT = 299792458
+
+
+def check_linearity_with_phase_unwrap_dual(timestamps, phases, max_k=6, r_squared_threshold=0.98):
+    """
+    检查在2π补偿下是否存在线性关系，分别拟合正负斜率的最优解
+    max_k: 每个点最多补偿的2π倍数范围 [-max_k, max_k]
+    """
+    n_points = len(phases)
+    
+    # 生成所有可能的补偿组合
+    k_combinations = list(itertools.product(range(-max_k, max_k+1), repeat=n_points))
+    
+    # 分别存储正负斜率的最优解
+    best_positive = {
+        'r_squared': -1,
+        'k_values': None,
+        'slope': None,
+        'intercept': None
+    }
+    
+    best_negative = {
+        'r_squared': -1,
+        'k_values': None,
+        'slope': None,
+        'intercept': None
+    }
+    
+    for k_vec in k_combinations:
+        # 应用补偿
+        compensated_phases = phases + np.array(k_vec) * 2 * np.pi
+        
+        # 线性拟合
+        if len(np.unique(timestamps)) > 1:
+            slope, intercept, r_value, p_value, std_err = stats.linregress(timestamps, compensated_phases)
+            r_squared = r_value ** 2
+            
+            # 根据斜率正负分别更新最优解
+            if slope >= 0:  # 正斜率
+                if r_squared > best_positive['r_squared']:
+                    best_positive['r_squared'] = r_squared
+                    best_positive['k_values'] = k_vec
+                    best_positive['slope'] = slope
+                    best_positive['intercept'] = intercept
+            else:  # 负斜率
+                if r_squared > best_negative['r_squared']:
+                    best_negative['r_squared'] = r_squared
+                    best_negative['k_values'] = k_vec
+                    best_negative['slope'] = slope
+                    best_negative['intercept'] = intercept
+    
+    # 输出结果
+    print("=" * 50)
+    print("正斜率最优解:")
+    print(f"  最佳 R²: {best_positive['r_squared']:.6f}")
+    print(f"  最佳补偿倍数: {best_positive['k_values']}")
+    print(f"  最佳斜率: {best_positive['slope']:.6f}")
+    
+    print("\n负斜率最优解:")
+    print(f"  最佳 R²: {best_negative['r_squared']:.6f}")
+    print(f"  最佳补偿倍数: {best_negative['k_values']}")
+    print(f"  最佳斜率: {best_negative['slope']:.6f}")
+    print("=" * 50)
+    
+    # 判断哪个方向的线性关系更好
+    if best_positive['r_squared'] > best_negative['r_squared']:
+        best_direction = 'positive'
+        best_overall = best_positive
+    else:
+        best_direction = 'negative'
+        best_overall = best_negative
+    
+    print(f"总体最优方向: {best_direction} (R² = {best_overall['r_squared']:.6f})")
+    
+    # 判断是否存在强线性关系
+    is_linear_positive = best_positive['r_squared'] > r_squared_threshold
+    is_linear_negative = best_negative['r_squared'] > r_squared_threshold
+    is_linear_overall = best_overall['r_squared'] > r_squared_threshold
+    
+    return (is_linear_positive, is_linear_negative, is_linear_overall, 
+            best_positive, best_negative, best_overall, best_direction)
+
+def warp_to_pi(angle):
+    return math.atan2(math.sin(angle), math.cos(angle))
+def estimate_angle(timestamps, phase_diff):
+    (is_linear_pos, is_linear_neg, is_linear_overall, 
+    best_pos, best_neg, best_overall, direction) = check_linearity_with_phase_unwrap_dual(
+        timestamps[:4], phase_diff[:4], max_k=2, r_squared_threshold=0.98
+    )
+    pos_new_phase_list = []
+    for i in range(5):
+        pos_new_phase_list.append(phase_diff[i] + best_pos['k_values'][i] * 2 * np.pi)
+
+    neg_new_phase_list = []
+    for i in range(5):
+        neg_new_phase_list.append(phase_diff[i] + best_neg['k_values'][i] * 2 * np.pi)
+
+    timestamps_init = timestamps[0]
+    timestamps = [timestamps[i]-timestamps_init for i in range(len(timestamps))]
+
+    pos_intercept = np.mean(pos_new_phase_list) - best_pos['slope'] * np.mean(timestamps)
+    neg_intercept = np.mean(neg_new_phase_list) - best_neg['slope'] * np.mean(timestamps)
+
+    pos_phase_delta = pos_intercept + best_pos['slope'] * (timestamps[4])
+    neg_phase_delta = neg_intercept + best_neg['slope'] * (timestamps[4])
+
+    pos_phase_est = warp_to_pi(pos_phase_delta)
+    neg_phase_est = warp_to_pi(neg_phase_delta)
+
+    pos_phase_delta_tx2 = pos_intercept + best_pos['slope'] * (timestamps[5])
+    neg_phase_delta_tx2 = neg_intercept + best_neg['slope'] * (timestamps[5])
+
+    pos_phase_est_tx2 = warp_to_pi(pos_phase_delta_tx2)
+    neg_phase_est_tx2 = warp_to_pi(neg_phase_delta_tx2)
+
+    plt.figure()
+    plt.plot(timestamps, pos_new_phase_list, 'o-', label='Pos Compensated Phase')
+    plt.plot(timestamps, neg_new_phase_list, 'o-', label='Neg Compensated Phase')
+    plt.plot(timestamps, phase_diff, 'x-', label='Original Phase')
+    # plt.plot(timestamps, np.arctan2(rx1_pkt_array[5]['Q_data'][0], rx1_pkt_array[5]['I_data'][0]) - np.arctan2(rx2_pkt_array[5]['Q_data'][0], rx2_pkt_array[5]['I_data'][0]), 'x-', c='g')
+    # plt.plot(rx1_pkt_array[5]['timestamp'] - rx1_timestamp_init, pos_tx2_phase_delta, 'o-', c='b')
+    # plt.plot(rx1_pkt_array[5]['timestamp'] - rx1_timestamp_init, neg_tx2_phase_delta, 'o-', c='orange')
+    plt.legend()
+    plt.show()
+
+    if abs(pos_phase_est - phase_diff[4]) < 0.05:
+        pos_tx2_phase_diff = phase_diff[5] - pos_phase_est_tx2 
+        pos_tx2_phase_diff = pos_tx2_phase_diff/6.28*12.5/6
+        print('pos_angle1:', np.arcsin(pos_tx2_phase_diff)/np.pi*180)
+
+    if abs(neg_phase_est - phase_diff[4]) < 0.05:
+        neg_tx2_phase_diff = phase_diff[5] - neg_phase_est_tx2
+        neg_tx2_phase_diff = neg_tx2_phase_diff/6.28*12.5/6
+        print('neg_angle1:', np.arcsin(neg_tx2_phase_diff)/np.pi*180)
+
+    if abs(pos_phase_est - phase_diff[4]) > 0.05 and abs(neg_phase_est - phase_diff[4]) > 0.05:
+        print('no good frame')
+
+    return True
 
 # 全局变量用于线程间通信
 shared_data = {
@@ -37,58 +178,6 @@ def parse_phase_data(raw_data):
     
     return phase, i_data, q_data
 
-def check_complete_sequence(ser_id, pkt_sqn, inner_sqn, phase_data):
-    """检查是否收到完整的0-5 inner_sqn序列，并保存相位数据"""
-    with shared_data['lock']:
-        if pkt_sqn in shared_data['triggered_pkts']:
-            return False
-            
-        if ser_id == 1:
-            data_dict = shared_data['ser1_data']
-            phase_dict = shared_data['ser1_phase_data']
-        else:
-            data_dict = shared_data['ser2_data']
-            phase_dict = shared_data['ser2_phase_data']
-        
-        # 保存inner_sqn
-        if inner_sqn not in data_dict[pkt_sqn]:
-            data_dict[pkt_sqn].append(inner_sqn)
-        
-        # 保存相位数据
-        if inner_sqn not in phase_dict[pkt_sqn]:
-            phase_dict[pkt_sqn].append({
-                'inner_sqn': inner_sqn,
-                'phase': phase_data['phase'],
-                'i_data': phase_data['i_data'],
-                'q_data': phase_data['q_data'],
-                'timestamp': phase_data['timestamp']
-            })
-        
-        # 检查是否包含完整的0-5序列
-        if len(data_dict[pkt_sqn]) >= 6:
-            sorted_seq = sorted(data_dict[pkt_sqn])
-            has_complete = all(x in sorted_seq for x in range(6))
-            return has_complete
-        return False
-
-def check_both_serials_complete(pkt_sqn):
-    """检查两个串口是否都收到了同一个pkt_sqn的完整inner_sqn序列"""
-    with shared_data['lock']:
-        if pkt_sqn in shared_data['triggered_pkts']:
-            return False
-        
-        ser1_has_complete = False
-        ser2_has_complete = False
-        
-        if pkt_sqn in shared_data['ser1_data']:
-            ser1_sorted = sorted(shared_data['ser1_data'][pkt_sqn])
-            ser1_has_complete = len(ser1_sorted) >= 6 and all(x in ser1_sorted for x in range(6))
-        
-        if pkt_sqn in shared_data['ser2_data']:
-            ser2_sorted = sorted(shared_data['ser2_data'][pkt_sqn])
-            ser2_has_complete = len(ser2_sorted) >= 6 and all(x in ser2_sorted for x in range(6))
-        
-        return ser1_has_complete and ser2_has_complete
 
 def process_phase_data(pkt_sqn):
     """处理相位数据的函数"""
@@ -101,121 +190,56 @@ def process_phase_data(pkt_sqn):
     ser2_phases_sorted = sorted(ser2_phases, key=lambda x: x['inner_sqn'])
     
     print(f"\n=== 处理pkt_sqn {pkt_sqn} 的相位数据 ===")
-    print(f"串口1数据: {len(ser1_phases_sorted)} 个相位点")
-    print(f"串口2数据: {len(ser2_phases_sorted)} 个相位点")
+    # print(f"串口1数据: {len(ser1_phases_sorted)} 个相位点")
+    # print(f"串口2数据: {len(ser2_phases_sorted)} 个相位点")
     
-    # 打印详细数据
-    for i, (phase1, phase2) in enumerate(zip(ser1_phases_sorted, ser2_phases_sorted)):
-        print(f"inner_sqn {i}: 串口1相位={phase1['phase']:.4f}, 串口2相位={phase2['phase']:.4f}")
+    # # 打印详细数据
+    # for i, (phase1, phase2) in enumerate(zip(ser1_phases_sorted, ser2_phases_sorted)):
+    #     print(f"inner_sqn {i}: 串口1相位={phase1['phase']:.4f}, 串口2相位={phase2['phase']:.4f}")
 
-    phase_diff = [phase2['phase'] - phase1['phase'] for phase1, phase2 in zip(ser1_phases_sorted, ser2_phases_sorted)]
-    print(phase_diff)
+    phase_diff = [phase1['phase'] - phase2['phase'] for phase1, phase2 in zip(ser1_phases_sorted, ser2_phases_sorted)]
+    timestamps = [phase1['timestamp'] for phase1 in ser1_phases_sorted]
+    estimate_angle(phase_diff, timestamps)
     # ser1_phase = [ser1_phases_sorted[i]['phase'] for i in len(ser1_phases_sorted)]
     # print(ser1_phase)
 
     print(f"\n===   {pkt_sqn} 的相位数据 处理完成===")
     return ser1_phases_sorted, ser2_phases_sorted
 
-def trigger_function(pkt_sqn):
-    """当检测到匹配序列时触发的函数"""
-    with shared_data['lock']:
-        if pkt_sqn in shared_data['triggered_pkts']:
-            return
-            
-        shared_data['triggered_pkts'].add(pkt_sqn)
-        shared_data['trigger_count'] += 1
-        shared_data['last_triggered_pkt_sqn'] = pkt_sqn
-        
-        current_count = shared_data['trigger_count']
-        max_triggers = shared_data['max_triggers']
-    
-    print(f"\n*** 触发函数 #{current_count}: pkt_sqn={pkt_sqn} ***")
-    
-    # 处理相位数据
-    ser1_data, ser2_data = process_phase_data(pkt_sqn)
-    
-    # 这里可以添加其他处理逻辑
-    # 例如：保存数据到文件、更新图形显示等
-    
-    if current_count >= max_triggers:
-        print(f"已达到最大触发次数 {max_triggers}")
-
-def cleanup_old_data():
-    """清理旧数据，防止内存泄漏"""
-    with shared_data['lock']:
-        max_keep_pkts = 20
-        
-        # 清理ser1数据
-        ser1_keys = list(shared_data['ser1_data'].keys())
-        if len(ser1_keys) > max_keep_pkts:
-            for key in ser1_keys[:-max_keep_pkts]:
-                if key in shared_data['ser1_data']:
-                    del shared_data['ser1_data'][key]
-                if key in shared_data['ser1_phase_data']:
-                    del shared_data['ser1_phase_data'][key]
-        
-        # 清理ser2数据
-        ser2_keys = list(shared_data['ser2_data'].keys())
-        if len(ser2_keys) > max_keep_pkts:
-            for key in ser2_keys[:-max_keep_pkts]:
-                if key in shared_data['ser2_data']:
-                    del shared_data['ser2_data'][key]
-                if key in shared_data['ser2_phase_data']:
-                    del shared_data['ser2_phase_data'][key]
 
 def thread(ser, ser_id):
     rawFrame = []
     last_cleanup = time.time()
     
     while True:
-        try:
-            if time.time() - last_cleanup > 5:
-                cleanup_old_data()
-                last_cleanup = time.time()
-                
-            byte = ser.read(1)
-            if byte:
-                rawFrame.append(byte[0])
-                
-                if len(rawFrame) >= 4 and rawFrame[-4:] == [255, 255, 255, 255]:
-                    if len(rawFrame) == 14:
-                        # 解析数据
-                        received_timestamp = struct.unpack('>I', bytes(rawFrame[4:8]))[0]
-                        received_pkt_sqn = rawFrame[8]
-                        received_pkt_inner_sqn = rawFrame[9]
+        byte = ser.read(1)
+        if byte:
+            rawFrame.append(byte[0])
+            
+            if len(rawFrame) >= 4 and rawFrame[-4:] == [255, 255, 255, 255]:
+                if len(rawFrame) == 14:
+                    # 解析数据
+                    received_timestamp = struct.unpack('>I', bytes(rawFrame[4:8]))[0]
+                    received_pkt_sqn = rawFrame[8]
+                    received_pkt_inner_sqn = rawFrame[9]
+                    
+                    # 解析相位数据
+                    phase, i_data, q_data = parse_phase_data(rawFrame[0:4])
+                    
+                    phase_data = {
+                        'phase': phase,
+                        'i_data': i_data,
+                        'q_data': q_data,
+                        'timestamp': received_timestamp
+                    }
+                    
+                    print(f"串口{ser_id} - pkt_sqn: {received_pkt_sqn}, inner_sqn: {received_pkt_inner_sqn}, "
+                            f"相位: {phase:.4f}, I: {i_data}, Q: {q_data}")
+                    
+                    rawFrame = []
+                else:
+                    rawFrame = []
                         
-                        # 解析相位数据
-                        phase, i_data, q_data = parse_phase_data(rawFrame[0:4])
-                        
-                        phase_data = {
-                            'phase': phase,
-                            'i_data': i_data,
-                            'q_data': q_data,
-                            'timestamp': received_timestamp
-                        }
-                        
-                        print(f"串口{ser_id} - pkt_sqn: {received_pkt_sqn}, inner_sqn: {received_pkt_inner_sqn}, "
-                              f"相位: {phase:.4f}, I: {i_data}, Q: {q_data}")
-                        
-                        # 检查当前串口是否收到完整序列
-                        current_complete = check_complete_sequence(ser_id, received_pkt_sqn, 
-                                                                  received_pkt_inner_sqn, phase_data)
-                        
-                        if current_complete:
-                            print(f"串口{ser_id} - pkt_sqn {received_pkt_sqn} 已收到完整inner_sqn序列")
-                            
-                            both_complete = check_both_serials_complete(received_pkt_sqn)
-                            
-                            if both_complete:
-                                trigger_function(received_pkt_sqn)
-                        
-                        rawFrame = []
-                    else:
-                        rawFrame = []
-                        
-        except Exception as e:
-            print(f"串口{ser_id}读取错误: {e}")
-            rawFrame = []
 
 def start_monitoring(ser1, ser2):
     print("串口监控已启动...")
@@ -234,10 +258,3 @@ def start_monitoring(ser1, ser2):
 # 启动监控
 start_monitoring(ser1, ser2)
 
-# 主线程保持运行
-try:
-    while shared_data['trigger_count'] < shared_data['max_triggers']:
-        time.sleep(0.1)
-    print("程序完成！")
-except KeyboardInterrupt:
-    print("程序被用户中断")
