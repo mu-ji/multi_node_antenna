@@ -107,7 +107,6 @@ def thread(ser, ser_id):
         byte = ser.read(1)
         if byte:
             rawFrame.append(byte[0])
-            
             if len(rawFrame) >= 4 and rawFrame[-4:] == [255, 255, 255, 255]:
                 if len(rawFrame) == 14:
                     received_timestamp = struct.unpack('>I', bytes(rawFrame[4:8]))[0]
@@ -189,7 +188,7 @@ def estimate_next_phase(timestamps, phase_diff):
     # plt.show()
 
     return pos_phase_est, neg_phase_est
-def data_process(ser1_data, ser2_data, threshold):
+def data_process(ser1_data, ser2_data, threshold, pos_angle_list, neg_angle_list):
     ser1_timestamps = ser1_data['timestamp']
     ser1_phases = ser1_data['phase']
     ser2_timestamps = ser2_data['timestamp']
@@ -212,25 +211,31 @@ def data_process(ser1_data, ser2_data, threshold):
     print(pos_phase_est)
     print(neg_phase_est)
     print(phase_diff[-2])
+
+    tx2_pos_est, tx2_neg_est = estimate_next_phase(ser2_timestamps[:-1], phase_diff[:-1])
+    pos_angle_est = np.arcsin((phase_diff[-1] - tx2_pos_est)/6.28*12.5/6)/np.pi*180
+    neg_angle_est = np.arcsin((phase_diff[-1] - tx2_neg_est)/6.28*12.5/6)/np.pi*180
+
     if abs(warp_to_pi(pos_phase_est - phase_diff[-2])) < threshold or abs(warp_to_pi(neg_phase_est - phase_diff[-2])) < threshold:
         tx2_pos_est, tx2_neg_est = estimate_next_phase(ser2_timestamps[:-1], phase_diff[:-1])
-
-        pos_tx2_phase_diff = phase_diff[-1] - tx2_pos_est
-        pos_tx2_phase_diff = pos_tx2_phase_diff/6.28*12.5/6
-        print('pos_angle1:', np.arcsin(pos_tx2_phase_diff)/np.pi*180)
-
-        neg_tx2_phase_diff = phase_diff[-1] - tx2_neg_est
-        neg_tx2_phase_diff = neg_tx2_phase_diff/6.28*12.5/6
-        print('neg_angle1:', np.arcsin(neg_tx2_phase_diff)/np.pi*180)
+        pos_angle_est = np.arcsin((phase_diff[-1] - tx2_pos_est)/6.28*12.5/6)/np.pi*180
+        neg_angle_est = np.arcsin((phase_diff[-1] - tx2_neg_est)/6.28*12.5/6)/np.pi*180
+        pos_angle_list.append(pos_angle_est)
+        neg_angle_list.append(neg_angle_est)
     else:
         print('no good frame')
+
+
     return 0
 
 def start_monitoring(ser1, ser2):
     global ser1_data, ser2_data
     print("串口监控已启动...")
     
-    while True:
+    pos_angle_list = []
+    neg_angle_list = []
+
+    while len(pos_angle_list)<=50:
         thread1 = threading.Thread(target=thread, args=(ser1, 1))
         thread2 = threading.Thread(target=thread, args=(ser2, 2))
         thread1.daemon = True
@@ -249,7 +254,7 @@ def start_monitoring(ser1, ser2):
         
         if is_valid:
             # 数据有效，进行处理
-            data_process(ser1_data, ser2_data, 0.2)
+            data_process(ser1_data, ser2_data, 0.2, pos_angle_list, neg_angle_list)
         else:
             # 数据无效，清除数据重新开始
             print("数据无效，重新开始监控...")
@@ -268,8 +273,9 @@ def start_monitoring(ser1, ser2):
         # 短暂延迟后继续下一轮
         time.sleep(0.1)
     
-    print(f"达到最大触发次数 {shared_data['max_triggers']}，监控结束")
-
+    print(f"达到最大触发次数{len(pos_angle_list)},监控结束")
+    np.savez('2025_10_20/indoor_experiment/angle_{}_pos.npz'.format(0), pos_angle_list)
+    np.savez('2025_10_20/indoor_experiment/angle_{}_neg.npz'.format(0), neg_angle_list)
 
 ser1 = serial.Serial('COM14', 115200)
 ser2 = serial.Serial('COM16', 115200)
