@@ -13,8 +13,8 @@ import time
 from sklearn.linear_model import LinearRegression
 from collections import deque
 
-ser1 = serial.Serial('COM14', 115200)
-ser2 = serial.Serial('COM16', 115200)
+ser1 = serial.Serial('COM7', 115200)
+ser2 = serial.Serial('COM11', 115200)
 # ser3 = serial.Serial('COM25', 115200)
 
 SPEED_OF_LIGHT  = 299792458
@@ -370,7 +370,7 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
         save_dict[f'{prefix}_rx2_pkt2_I'] = trigger_data['rx2_data']['packet_2_I_data']
         save_dict[f'{prefix}_rx2_pkt2_Q'] = trigger_data['rx2_data']['packet_2_Q_data']
         
-    save_filename = 'discrete_antenna_experiment/tx1d_{}_tx1a_{}_tx2d{}_tx2a_{}.npz'.format(10)
+    save_filename = 'discrete_antenna_experiment/tx1d_{}_tx1a_{}_tx2d_{}_tx2a_{}.npz'.format(30, 0, 30, -80)
     # save_filename = 'antenna_array_experiment/same_antenna.npz'
     np.savez(save_filename, **save_dict)
     print(f"数据已保存到 {save_filename}")

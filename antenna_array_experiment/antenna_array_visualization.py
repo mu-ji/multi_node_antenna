@@ -234,7 +234,7 @@ def compensate_phase_offset(trigger_data, ref_position):
 
     slope_12, intercept_12 = cal_slope(pkt1_phase_diff_12)
 
-    # target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16))
+    #target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12 + slope_12 * interval/16), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12 + slope_12 * interval/16))
     target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12))
 
     print(target_phase_diff_12)
@@ -374,7 +374,8 @@ if __name__ == '__main__':
     # filename = 'antenna_array_experiment/angle_-20.npz'
     # filename = 'antenna_array_experiment/same_antenna.npz'
     # filename = 'three_rx_experiment/angle_-20.npz'
-    filename = 'discrete_antenna_experiment/angle_10.npz'
+    # filename = 'discrete_antenna_experiment/angle_10.npz'
+    filename = 'discrete_antenna_experiment/tx1d_30_tx1a_0_tx2d_30_tx2a_10.npz'
     # 加载数据
     data_dict = load_data(filename)
     print(f"成功加载 {data_dict['num_triggers']} 次触发数据")
