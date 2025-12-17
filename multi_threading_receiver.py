@@ -15,7 +15,7 @@ from collections import deque
 
 ser1 = serial.Serial('COM14', 115200)
 ser2 = serial.Serial('COM16', 115200)
-ser3 = serial.Serial('COM25', 115200)
+# ser3 = serial.Serial('COM25', 115200)
 
 SPEED_OF_LIGHT  = 299792458
 num_iterations = 50     # 进行的循环次数
@@ -153,15 +153,7 @@ def thread(ser, id):
                     ser2_data['packet_2_I_data'][0] = packet_2_I_data
                     ser2_data['packet_2_Q_data'][0] = packet_2_Q_data
                     break
-                else:
-                    ser3_data['interval'][0] = interval
-                    ser3_data['tx1_sqn'][0] = tx1_sqn
-                    ser3_data['tx2_sqn'][0] = tx2_sqn
-                    ser3_data['packet_1_I_data'][0] = packet_1_I_data
-                    ser3_data['packet_1_Q_data'][0] = packet_1_Q_data
-                    ser3_data['packet_2_I_data'][0] = packet_2_I_data
-                    ser3_data['packet_2_Q_data'][0] = packet_2_Q_data
-                    break
+
                 #np.savez('data_{}.npz'.format(id), **all_data)
             else:
                 # 帧尾已到，但长度与预期不符，打印调试信息
@@ -181,7 +173,7 @@ def cal_slope(phase_diff):
     return model.coef_[0], model.intercept_
 
 
-def data_process(ser1_data, ser2_data, ser3_data, first_tx_angle_deg=None, use_music=True, music_grid_step=0.5):
+def data_process(ser1_data, ser2_data, first_tx_angle_deg=None, use_music=True, music_grid_step=0.5):
     # 提取三个接收端的两包 IQ 数据
     rx1_packet1_I = ser1_data['packet_1_I_data'][0]
     rx1_packet1_Q = ser1_data['packet_1_Q_data'][0]
@@ -195,55 +187,41 @@ def data_process(ser1_data, ser2_data, ser3_data, first_tx_angle_deg=None, use_m
     rx2_packet2_Q = ser2_data['packet_2_Q_data'][0]
     interval2 = ser2_data['interval'][0]
 
-    rx3_packet1_I = ser3_data['packet_1_I_data'][0]
-    rx3_packet1_Q = ser3_data['packet_1_Q_data'][0]
-    rx3_packet2_I = ser3_data['packet_2_I_data'][0]
-    rx3_packet2_Q = ser3_data['packet_2_Q_data'][0]
-    interval3 = ser3_data['interval'][0]
-
     # 取三路 interval 的平均作为两包间隔估计
-    interval = (interval1 + interval2 + interval3) / 3
+    interval = (interval1 + interval2) / 2
 
     # 计算每路相位
     rx1_pkt1_phase = np.unwrap(np.arctan2(rx1_packet1_Q, rx1_packet1_I))
     rx1_pkt2_phase = np.unwrap(np.arctan2(rx1_packet2_Q, rx1_packet2_I))
     rx2_pkt1_phase = np.unwrap(np.arctan2(rx2_packet1_Q, rx2_packet1_I))
     rx2_pkt2_phase = np.unwrap(np.arctan2(rx2_packet2_Q, rx2_packet2_I))
-    rx3_pkt1_phase = np.unwrap(np.arctan2(rx3_packet1_Q, rx3_packet1_I))
-    rx3_pkt2_phase = np.unwrap(np.arctan2(rx3_packet2_Q, rx3_packet2_I))
 
     # 利用 pkt1 估计本地相位差与漂移（两两组合）
     # 1-2
     pkt1_diff_12 = np.unwrap(rx1_pkt1_phase - rx2_pkt1_phase)
     slope12, intercept12 = cal_slope(pkt1_diff_12)
     # 1-3
-    pkt1_diff_13 = np.unwrap(rx1_pkt1_phase - rx3_pkt1_phase)
-    slope13, intercept13 = cal_slope(pkt1_diff_13)
 
     # pkt2 的观测相位差
     pkt2_diff_12 = np.unwrap(rx1_pkt2_phase - rx2_pkt2_phase)
-    pkt2_diff_13 = np.unwrap(rx1_pkt2_phase - rx3_pkt2_phase)
+
 
     # 若提供了第一发送方角度与阵列几何，用其理论几何相位差对本地相位进行标定
     geo12_expected = 0.0
     geo13_expected = 0.0
     if first_tx_angle_deg is not None:
         geo12_expected = compute_phase_difference(SIGNAL_FREQUENCY_HZ, SPACING_M_12, first_tx_angle_deg)
-        geo13_expected = compute_phase_difference(SIGNAL_FREQUENCY_HZ, SPACING_M_13, first_tx_angle_deg)
 
     # 按两包时间间隔对本地相位差进行外推补偿
     # 基于 pkt1 的拟合结果减去理论几何项，得到本地相位基准，再外推到 pkt2 时刻
     drift12_base = intercept12 - geo12_expected
-    drift13_base = intercept13 - geo13_expected
+
     drift12 = drift12_base + interval/16 * slope12
-    drift13 = drift13_base + interval/16 * slope13
 
     # 去除本地相位差与漂移，得到几何相位差估计
     geo12 = pkt2_diff_12 - drift12
-    geo13 = pkt2_diff_13 - drift13
     # 归一化到 [-pi, pi]
     geo12 = np.arctan2(np.sin(geo12), np.cos(geo12))
-    geo13 = np.arctan2(np.sin(geo13), np.cos(geo13))
 
     # 由几何相位差估计角度（沿用原先常量与公式）
     def phase_to_angle(geo):
@@ -255,13 +233,13 @@ def data_process(ser1_data, ser2_data, ser3_data, first_tx_angle_deg=None, use_m
         return np.arcsin(val)/np.pi*180
 
     angle12 = phase_to_angle(np.mean(geo12))
-    angle13 = phase_to_angle(np.mean(geo13))
-    fallback_angle = (angle12 - angle13) / 2
-    print(angle12, angle13)
+
+    fallback_angle = angle12
+
     return fallback_angle
 
 def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
-    global ser1_data, ser2_data, ser3_data
+    global ser1_data, ser2_data
     print("串口监控已启动...")
     
     angle_list = []
@@ -270,23 +248,18 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
     # 为解决多串口异步到达，维护滑动窗口缓冲
     ser1_buffer = deque(maxlen=20)
     ser2_buffer = deque(maxlen=20)
-    ser3_buffer = deque(maxlen=20)
 
     while len(angle_list)<=50:
         thread1 = threading.Thread(target=thread, args=(ser1, 1))
         thread2 = threading.Thread(target=thread, args=(ser2, 2))
-        thread3 = threading.Thread(target=thread, args=(ser3, 3))
         thread1.daemon = True
         thread2.daemon = True
-        thread3.daemon = True
         thread1.start()
         thread2.start()
-        thread3.start()
-        
+
         # 等待三个线程终止
         thread1.join()
         thread2.join()
-        thread3.join()
         
         print("两个线程均已终止，开始检查数据...")
         
@@ -311,31 +284,20 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
                 'packet_2_I_data': [ser2_data['packet_2_I_data'][0]],
                 'packet_2_Q_data': [ser2_data['packet_2_Q_data'][0]],
             })
-        if ser3_data['tx1_sqn'][0] != -1 and ser3_data['tx2_sqn'][0] != -1:
-            ser3_buffer.append({
-                'interval': [ser3_data['interval'][0]],
-                'tx1_sqn': [ser3_data['tx1_sqn'][0]],
-                'tx2_sqn': [ser3_data['tx2_sqn'][0]],
-                'packet_1_I_data': [ser3_data['packet_1_I_data'][0]],
-                'packet_1_Q_data': [ser3_data['packet_1_Q_data'][0]],
-                'packet_2_I_data': [ser3_data['packet_2_I_data'][0]],
-                'packet_2_Q_data': [ser3_data['packet_2_Q_data'][0]],
-            })
 
         # 在缓冲中寻找三路匹配 (tx1_sqn, tx2_sqn) —— 使用键交集降低复杂度
         matched = False
         keys1 = set((x['tx1_sqn'][0], x['tx2_sqn'][0]) for x in ser1_buffer)
         keys2 = set((x['tx1_sqn'][0], x['tx2_sqn'][0]) for x in ser2_buffer)
-        keys3 = set((x['tx1_sqn'][0], x['tx2_sqn'][0]) for x in ser3_buffer)
-        common_keys = keys1 & keys2 & keys3
+        common_keys = keys1 & keys2
         # common_keys = keys2 & keys3
         if common_keys:
             k = next(iter(common_keys))
             a = next(x for x in ser1_buffer if (x['tx1_sqn'][0], x['tx2_sqn'][0]) == k)
             b = next(x for x in ser2_buffer if (x['tx1_sqn'][0], x['tx2_sqn'][0]) == k)
-            c = next(x for x in ser3_buffer if (x['tx1_sqn'][0], x['tx2_sqn'][0]) == k)
-            print(a['tx1_sqn'][0], a['tx2_sqn'][0], b['tx1_sqn'][0], b['tx2_sqn'][0], c['tx1_sqn'][0], c['tx2_sqn'][0])
-            angle = data_process(a, b, c, first_tx_angle_deg=first_tx_angle_deg)
+
+            print(a['tx1_sqn'][0], a['tx2_sqn'][0], b['tx1_sqn'][0], b['tx2_sqn'][0])
+            angle = data_process(a, b, first_tx_angle_deg=first_tx_angle_deg)
             angle_list.append(angle)
             
             # 保存本次触发的三个串口数据
@@ -359,15 +321,6 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
                     'packet_1_Q_data': b['packet_1_Q_data'][0].copy(),
                     'packet_2_I_data': b['packet_2_I_data'][0].copy(),
                     'packet_2_Q_data': b['packet_2_Q_data'][0].copy(),
-                },
-                'rx3_data': {
-                    'interval': c['interval'][0],
-                    'tx1_sqn': c['tx1_sqn'][0],
-                    'tx2_sqn': c['tx2_sqn'][0],
-                    'packet_1_I_data': c['packet_1_I_data'][0].copy(),
-                    'packet_1_Q_data': c['packet_1_Q_data'][0].copy(),
-                    'packet_2_I_data': c['packet_2_I_data'][0].copy(),
-                    'packet_2_Q_data': c['packet_2_Q_data'][0].copy(),
                 }
             }
             all_data_list.append(trigger_data)
@@ -378,10 +331,6 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
                 pass
             try:
                 ser2_buffer.remove(b)
-            except ValueError:
-                pass
-            try:
-                ser3_buffer.remove(c)
             except ValueError:
                 pass
             matched = True
@@ -421,15 +370,8 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
         save_dict[f'{prefix}_rx2_pkt2_I'] = trigger_data['rx2_data']['packet_2_I_data']
         save_dict[f'{prefix}_rx2_pkt2_Q'] = trigger_data['rx2_data']['packet_2_Q_data']
         
-        save_dict[f'{prefix}_rx3_interval'] = trigger_data['rx3_data']['interval']
-        save_dict[f'{prefix}_rx3_tx1_sqn'] = trigger_data['rx3_data']['tx1_sqn']
-        save_dict[f'{prefix}_rx3_tx2_sqn'] = trigger_data['rx3_data']['tx2_sqn']
-        save_dict[f'{prefix}_rx3_pkt1_I'] = trigger_data['rx3_data']['packet_1_I_data']
-        save_dict[f'{prefix}_rx3_pkt1_Q'] = trigger_data['rx3_data']['packet_1_Q_data']
-        save_dict[f'{prefix}_rx3_pkt2_I'] = trigger_data['rx3_data']['packet_2_I_data']
-        save_dict[f'{prefix}_rx3_pkt2_Q'] = trigger_data['rx3_data']['packet_2_Q_data']
-    
-    save_filename = 'three_rx_experiment/angle_{}.npz'.format(-45)
+    save_filename = 'discrete_antenna_experiment/tx1d_{}_tx1a_{}_tx2d{}_tx2a_{}.npz'.format(10)
+    # save_filename = 'antenna_array_experiment/same_antenna.npz'
     np.savez(save_filename, **save_dict)
     print(f"数据已保存到 {save_filename}")
     print(f"共保存了 {len(all_data_list)} 次触发数据")

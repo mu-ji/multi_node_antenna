@@ -200,6 +200,7 @@ if __name__ == '__main__':
 
         axes[0, 0].violinplot(phase12_list, positions=[int(index)/10])
         axes[0, 0].plot((-4.5, 4.5), (-45, 45))
+        axes[0, 0].plot((-4.5, 4.5), (45, -45))
         axes[0, 0].set_ylim(-90, 100)
         axes[0, 0].set_title('angle estimation by RX12')
         axes[0, 0].set_xlabel('true angle')
@@ -208,6 +209,7 @@ if __name__ == '__main__':
 
         axes[0, 1].violinplot(phase23_list, positions=[int(index)/10])
         axes[0, 1].plot((-4.5, 4.5), (-45, 45))
+        axes[0, 1].plot((-4.5, 4.5), (45, -45))
         axes[0, 1].set_ylim(-90, 100)
         axes[0, 1].set_title('angle estimation by RX23')
         axes[0, 1].set_xlabel('true angle')
@@ -216,6 +218,7 @@ if __name__ == '__main__':
 
         axes[1, 0].violinplot(est_angle_list, positions=[int(index)/10])
         axes[1, 0].plot((-4.5, 4.5), (-45, 45))
+        axes[1, 0].plot((-4.5, 4.5), (45, -45))
         axes[1, 0].set_ylim(-90, 100)
         axes[1, 0].set_title('angle estimation by RX123')
         axes[1, 0].set_xlabel('true angle')
@@ -224,3 +227,29 @@ if __name__ == '__main__':
     plt.show()
     # plt.scatter([i for i in range(len(est_angle_list))], est_angle_list)
     # plt.show()
+
+    filename = 'three_rx_experiment/angle_-10.npz'
+    data_dict = load_data(filename)
+    
+    est_angle_list = []
+    phase12_list = []
+    phase23_list = []
+    pkt_sqn_list = []
+    for i in range(len(data_dict['triggers'])):
+        trigger = data_dict['triggers'][i]
+        # show_slotframe(trigger)
+        rx1_data = trigger['rx1_data']
+        pkt_sqn_list.append(rx1_data['tx1_sqn'])
+        angle,phase12,phase23 = compensate_phase_offset(trigger, 0)
+        est_angle_list.append(angle)
+        phase12_list.append(phase12)
+        phase23_list.append(phase23)
+
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    axes[0].violinplot(phase12_list, positions=[1])
+    axes[0].violinplot(phase23_list, positions=[2])
+    axes[0].violinplot(est_angle_list, positions=[3])
+
+    axes[1].plot(pkt_sqn_list, phase12_list, marker='.')
+    plt.show()
