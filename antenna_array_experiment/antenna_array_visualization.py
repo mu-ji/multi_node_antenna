@@ -6,7 +6,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
-
+from sklearn.mixture import GaussianMixture
 
 import cmath
 
@@ -17,7 +17,7 @@ def load_data(filename):
     加载保存的实验数据
     
     参数:
-        filename: 数据文件路径
+        filename: 数据文件路径 
     
     返回:
         data_dict: 包含所有数据的字典
@@ -219,6 +219,13 @@ def compensate_phase_offset(trigger_data, ref_position):
     rx2_pkt1_phase = np.arctan2(rx2_data['packet_1_Q_data'], rx2_data['packet_1_I_data'])
     rx2_pkt2_phase = np.arctan2(rx2_data['packet_2_Q_data'], rx2_data['packet_2_I_data'])
     
+    # plt.figure()
+    # plt.plot(np.sqrt(rx1_data['packet_1_I_data']**2 + rx1_data['packet_1_Q_data']**2), 'b-o', markersize=3, linewidth=1.5, label='RX1 Pkt1')
+    # plt.plot(np.sqrt(rx2_data['packet_1_I_data']**2 + rx2_data['packet_1_Q_data']**2), 'g-o', markersize=3, linewidth=1.5, label='RX2 Pkt1')
+    # plt.plot(np.sqrt(rx1_data['packet_2_I_data']**2 + rx1_data['packet_2_Q_data']**2), 'b-s', markersize=3, linewidth=1.5, label='RX1 Pkt2')
+    # plt.plot(np.sqrt(rx2_data['packet_2_I_data']**2 + rx2_data['packet_2_Q_data']**2), 'g-s', markersize=3, linewidth=1.5, label='RX2 Pkt2')
+    # plt.legend()
+    # plt.show()
 
     interval = (rx1_data['interval'] + rx2_data['interval'])/2
     # 计算每个接收端每个包的相位
@@ -234,8 +241,11 @@ def compensate_phase_offset(trigger_data, ref_position):
 
     slope_12, intercept_12 = cal_slope(pkt1_phase_diff_12)
 
-    #target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12 + slope_12 * interval/16), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12 + slope_12 * interval/16))
-    target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12))
+    print('slope_12:', slope_12)
+    print('interval:', interval)
+    print('interval:', slope_12 * interval/16)
+    target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16))
+    # target_phase_diff_12 = np.arctan2(np.sin(pkt1_phase_diff_12 - pkt2_phase_diff_12), np.cos(pkt1_phase_diff_12 - pkt2_phase_diff_12))
 
     print(target_phase_diff_12)
     target_phase_diff_12_unwrap = unwrap_and_adjust(target_phase_diff_12)
@@ -330,6 +340,18 @@ def compensate_phase_offset(trigger_data, ref_position):
     # plt.tight_layout()
     # plt.show()
 
+
+    # the amplitude can identifiy the traget is at the left side or right side
+
+    # plt.figure()
+    # plt.plot(rx1_data['packet_2_I_data']**2 + rx1_data['packet_2_Q_data']**2, 'b-o', markersize=3, linewidth=1.5, label='RX1 Pkt2')
+    # plt.plot(rx1_data['packet_1_I_data']**2 + rx1_data['packet_1_Q_data']**2, 'b-s', markersize=3, linewidth=1.5, label='RX1 Pkt1')
+    # plt.plot(rx2_data['packet_2_I_data']**2 + rx2_data['packet_2_Q_data']**2, 'g-o', markersize=3, linewidth=1.5, label='RX2 Pkt2')
+    # plt.plot(rx2_data['packet_1_I_data']**2 + rx2_data['packet_1_Q_data']**2, 'g-s', markersize=3, linewidth=1.5, label='RX2 Pkt1')
+
+    # plt.legend()
+    # plt.show()
+
     phase_12 = np.mean(target_phase_diff_12_unwrap)
     # plt.figure()
     # plt.hist( target_phase_diff_12, bins=30)
@@ -338,35 +360,41 @@ def compensate_phase_offset(trigger_data, ref_position):
     array1 = unwrap_and_adjust(rx1_pkt1_phase - rx1_pkt2_phase)
     array2 = unwrap_and_adjust(rx2_pkt1_phase - rx2_pkt2_phase)
     array12 = unwrap_and_adjust(array1 - array2)
-    if abs(np.mean(array12)) < np.pi/2:
-        return phase_to_angle(phase_12)
+
+    # if abs(np.mean(array12)) < np.pi: 
+    #     if np.mean(array12) < 0:
+    #         return phase_to_angle(phase_12 - np.pi)
+    #     else:
+    #         return phase_to_angle(phase_12)
+    # else:
+    #     return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
+
+    rx1_amplitude = np.mean(np.sqrt(rx1_data['packet_2_I_data']**2 + rx1_data['packet_2_Q_data']**2))
+    rx2_amplitude = np.mean(np.sqrt(rx2_data['packet_2_I_data']**2 + rx2_data['packet_2_Q_data']**2))
+
+    if rx1_amplitude < rx2_amplitude:
+        if phase_12 > 0:
+            return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
+        else:
+            return phase_to_angle(np.arctan2(np.sin(phase_12), np.cos(phase_12)))
     else:
-        return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
+        if phase_12 < 0:
+            return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
+        else:
+            return phase_to_angle(np.arctan2(np.sin(phase_12), np.cos(phase_12)))
+
     return phase_to_angle(phase_12)
 
 
+def filter_array(arr):
+    arr = np.array(arr)
+    value_to_remove = 90
+    mask = (arr != value_to_remove) & (arr != -90)
+    print(mask)
+    new_arr = arr[mask]
+    return new_arr
 
-def cheng_visualization(trigger_data):
-        # 提取三个接收端的数据
-    rx1_data = trigger_data['rx1_data']
-    rx2_data = trigger_data['rx2_data']
-    
-    # RX1
-    rx1_pkt1_amplitude = np.sqrt(rx1_data['packet_1_I_data']**2 + rx1_data['packet_1_Q_data']**2)
-    rx1_pkt2_amplitude = np.sqrt(rx1_data['packet_2_I_data']**2 + rx1_data['packet_2_Q_data']**2)
-    # RX2
-    rx2_pkt1_amplitude = np.sqrt(rx2_data['packet_1_I_data']**2 + rx2_data['packet_1_Q_data']**2)
-    rx2_pkt2_amplitude = np.sqrt(rx2_data['packet_2_I_data']**2 + rx2_data['packet_2_Q_data']**2)
 
-    plt.figure()
-    plt.plot(rx1_pkt1_amplitude, 'b-o', markersize=3, linewidth=1.5, label='RX1 Pkt1')
-    plt.plot(rx1_pkt2_amplitude, 'b-s', markersize=3, linewidth=1.5, label='RX1 Pkt2')
-    plt.plot(rx2_pkt1_amplitude, 'g-o', markersize=3, linewidth=1.5, label='RX2 Pkt1')
-    plt.plot(rx2_pkt2_amplitude, 'g-s', markersize=3, linewidth=1.5, label='RX2 Pkt2')
-    plt.legend()
-    plt.show()
-
-    return rx1_pkt1_amplitude,rx1_pkt2_amplitude,rx2_pkt1_amplitude,rx2_pkt2_amplitude
 
 # 使用示例：
 if __name__ == '__main__':
@@ -375,31 +403,12 @@ if __name__ == '__main__':
     # filename = 'antenna_array_experiment/same_antenna.npz'
     # filename = 'three_rx_experiment/angle_-20.npz'
     # filename = 'discrete_antenna_experiment/angle_10.npz'
-    filename = 'discrete_antenna_experiment/tx1d_30_tx1a_0_tx2d_30_tx2a_10.npz'
+    filename = 'discrete_antenna_experiment/tx1d_30_tx1a_0_tx2d_30_tx2a_-10.npz'
+    # filename = 'discrete_antenna_experiment/ondesk_{}.npz'.format(-10)
     # 加载数据
     data_dict = load_data(filename)
     print(f"成功加载 {data_dict['num_triggers']} 次触发数据")
     print(f"角度列表: {data_dict['angle_list']}")
-    # rx1pkt1_list = []
-    # rx1pkt2_list = []
-    # rx2pkt1_list = []
-    # rx2pkt2_list = []
-    # for i in range(len(data_dict['triggers'])):
-    #     trigger = data_dict['triggers'][i]
-    #     rx1_pkt1_amplitude,rx1_pkt2_amplitude,rx2_pkt1_amplitude,rx2_pkt2_amplitude = cheng_visualization(trigger)
-    #     rx1pkt1_list.append(np.mean(rx1_pkt1_amplitude))
-    #     rx1pkt2_list.append(np.mean(rx1_pkt2_amplitude))
-    #     rx2pkt1_list.append(np.mean(rx2_pkt1_amplitude))
-    #     rx2pkt2_list.append(np.mean(rx2_pkt2_amplitude))
-    
-    # plt.figure()
-    # plt.plot(rx1pkt1_list, 'b-o', markersize=3, linewidth=1.5, label='RX1 Pkt1')
-    # plt.plot(rx1pkt2_list, 'b-s', markersize=3, linewidth=1.5, label='RX1 Pkt2')
-    # plt.plot(rx2pkt1_list, 'g-o', markersize=3, linewidth=1.5, label='RX2 Pkt1')
-    # plt.plot(rx2pkt2_list, 'g-s', markersize=3, linewidth=1.5, label='RX2 Pkt2')
-    # plt.legend()
-    # plt.show()
-
 
     est_angle_list = []
     phase12_list = []
@@ -422,18 +431,22 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
+    plt.figure()
+    plt.plot(phase12_list, 'o')
+    plt.show() 
     # plt.scatter([i for i in range(len(est_angle_list))], est_angle_list)
     # plt.show()
 
     # 创建包含两个子图的画布
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    position_list = [-20, -10, 10, 20, 30]
+    position_list = [-80, -70, -60, -50, -40, -30, -20, -10, 10, 20, 30, 40, 50, 60, 70, 80]
     all_phase_data = []
-
+    # position_list = [-20, -10, 10, 20, 30]
     # 收集所有数据
     for pos in position_list:
-        filename = 'discrete_antenna_experiment/angle_{}.npz'.format(pos)
+        filename = 'discrete_antenna_experiment/tx1d_30_tx1a_0_tx2d_30_tx2a_{}.npz'.format(pos)
+        # filename = 'discrete_antenna_experiment/angle_{}.npz'.format(pos)
         data_dict = load_data(filename)
         print(f"成功加载 {data_dict['num_triggers']} 次触发数据")
         print(f"角度列表: {data_dict['angle_list']}")
@@ -483,7 +496,20 @@ if __name__ == '__main__':
     violin_patch = mpatches.Patch(color='blue', alpha=0.7, label='小提琴图')
     box_patch = mpatches.Patch(color='lightblue', alpha=0.7, label='箱线图')
     ax2.legend(handles=[box_patch], loc='upper right')
+    ax2.set_ylim(-90, 90)
 
     # 调整布局并显示
     plt.tight_layout()
+    plt.show()
+
+    print(all_phase_data[0])
+    plt.figure()
+    for i in range(len(all_phase_data)):
+
+        new_array = filter_array(all_phase_data[i])
+        plt.violinplot(new_array, positions=[position_list[i]/10])
+        plt.boxplot(new_array, positions=[position_list[i]/10])
+    
+    plt.plot([-8, 8], [80, -80], 'r--', label='Ideal Line')
+    plt.grid()
     plt.show()

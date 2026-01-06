@@ -13,8 +13,8 @@ import time
 from sklearn.linear_model import LinearRegression
 from collections import deque
 
-ser1 = serial.Serial('COM7', 115200)
-ser2 = serial.Serial('COM11', 115200)
+ser1 = serial.Serial('COM14', 115200)
+ser2 = serial.Serial('COM16', 115200)
 # ser3 = serial.Serial('COM25', 115200)
 
 SPEED_OF_LIGHT  = 299792458
@@ -45,15 +45,6 @@ ser1_data = {
 }
 
 ser2_data = {
-    'interval': [-1],
-    'tx1_sqn': [-1],
-    'tx2_sqn': [-1],
-    'packet_1_I_data': [-1],
-    'packet_1_Q_data': [-1],
-    'packet_2_I_data': [-1],
-    'packet_2_Q_data': [-1]
-}
-ser3_data = {
     'interval': [-1],
     'tx1_sqn': [-1],
     'tx2_sqn': [-1],
@@ -95,6 +86,7 @@ def thread(ser, id):
     while True:
         byte  = ser.read(1)        
         rawFrame += byte
+        # print(rawFrame)
         if rawFrame[-6:]==[255, 255, 255, 255, 255, 255]:
             if len(rawFrame) == 4*num_samples*2+12:
                 received_data_1 = rawFrame[:4*num_samples]
@@ -131,7 +123,7 @@ def thread(ser, id):
                 packet_2_I_data = packet_2_I_data.astype(np.float32)
                 packet_2_Q_data = packet_2_Q_data.astype(np.float32)
 
-                #print('phase_{}_1:'.format(id), np.arctan2(packet_1_I_data[1], packet_1_Q_data[1]))
+                # print('phase_{}_1:'.format(id), np.arctan2(packet_1_I_data[1], packet_1_Q_data[1]))
 
                 #all_data['I_data'] = I_data
                 #all_data['Q_data'] = Q_data
@@ -257,7 +249,7 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
         thread1.start()
         thread2.start()
 
-        # 等待三个线程终止
+        # # 等待三个线程终止
         thread1.join()
         thread2.join()
         
@@ -370,7 +362,8 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
         save_dict[f'{prefix}_rx2_pkt2_I'] = trigger_data['rx2_data']['packet_2_I_data']
         save_dict[f'{prefix}_rx2_pkt2_Q'] = trigger_data['rx2_data']['packet_2_Q_data']
         
-    save_filename = 'discrete_antenna_experiment/tx1d_{}_tx1a_{}_tx2d_{}_tx2a_{}.npz'.format(30, 0, 30, -80)
+    # save_filename = 'discrete_antenna_experiment/tx1d_{}_tx1a_{}_tx2d_{}_tx2a_{}.npz'.format(30, 0, 30, -80)
+    save_filename = 'discrete_antenna_experiment/ondesk_{}.npz'.format(-10)
     # save_filename = 'antenna_array_experiment/same_antenna.npz'
     np.savez(save_filename, **save_dict)
     print(f"数据已保存到 {save_filename}")
