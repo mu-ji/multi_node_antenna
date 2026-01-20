@@ -408,7 +408,7 @@ if __name__ == '__main__':
     # filename = 'antenna_array_experiment/same_antenna.npz'
     # filename = 'three_rx_experiment/angle_-20.npz'
     # filename = 'discrete_antenna_experiment/angle_10.npz'
-    filename = 'discrete_antenna_experiment/tx1d_30_tx1a_0_tx2d_30_tx2a_-10.npz'
+    filename = 'discrete_antenna_experiment/tx1d_30_tx1a_0_tx2d_40_tx2a_-40.npz'
     # filename = 'discrete_antenna_experiment/ondesk_{}.npz'.format(-10)
     # 加载数据
     data_dict = load_data(filename)
@@ -450,8 +450,8 @@ if __name__ == '__main__':
     # position_list = [-20, -10, 10, 20, 30]
     # 收集所有数据
     for pos in position_list:
-        anchor_angle = 30
-        filename = 'discrete_antenna_experiment/tx1d_20_tx1a_{}_tx2d_30_tx2a_{}.npz'.format(anchor_angle, pos)
+        anchor_angle = -20
+        filename = 'discrete_antenna_experiment/tx1d_30_tx1a_{}_tx2d_40_tx2a_{}.npz'.format(anchor_angle, pos)
         # filename = 'discrete_antenna_experiment/angle_{}.npz'.format(pos)
         data_dict = load_data(filename)
         print(f"成功加载 {data_dict['num_triggers']} 次触发数据")

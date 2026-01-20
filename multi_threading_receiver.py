@@ -362,7 +362,7 @@ def start_monitoring(ser1, ser2, first_tx_angle_deg=None):
         save_dict[f'{prefix}_rx2_pkt2_I'] = trigger_data['rx2_data']['packet_2_I_data']
         save_dict[f'{prefix}_rx2_pkt2_Q'] = trigger_data['rx2_data']['packet_2_Q_data']
         
-    save_filename = 'discrete_antenna_experiment/tx1d_{}_tx1a_{}_tx2d_{}_tx2a_{}.npz'.format(20, -20, 30, 80)
+    save_filename = 'discrete_antenna_experiment/tx1d_{}_tx1a_{}_tx2d_{}_tx2a_{}.npz'.format(30, 30, 40, -80)
     # save_filename = 'discrete_antenna_experiment/ondesk_{}.npz'.format(-10)
     # save_filename = 'antenna_array_experiment/same_antenna.npz'
     np.savez(save_filename, **save_dict)
