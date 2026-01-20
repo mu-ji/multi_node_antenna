@@ -205,6 +205,9 @@ def unwrap_and_adjust(numpy_array):
     unwrapped = np.unwrap(numpy_array)
     adjusted_array = np.arctan2(np.sin(unwrapped), np.cos(unwrapped))
     return adjusted_array
+
+def angle_to_phase(angle):
+    return angle/180*np.pi*4.3/12.5*2*np.pi
 def compensate_phase_offset(trigger_data, ref_position):
     # 提取三个接收端的数据
     rx1_data = trigger_data['rx1_data']
@@ -244,7 +247,9 @@ def compensate_phase_offset(trigger_data, ref_position):
     print('slope_12:', slope_12)
     print('interval:', interval)
     print('interval:', slope_12 * interval/16)
-    target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16))
+    anchor_phase = angle_to_phase(ref_position)
+
+    target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16 - anchor_phase), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16 - anchor_phase))
     # target_phase_diff_12 = np.arctan2(np.sin(pkt1_phase_diff_12 - pkt2_phase_diff_12), np.cos(pkt1_phase_diff_12 - pkt2_phase_diff_12))
 
     print(target_phase_diff_12)
@@ -440,12 +445,13 @@ if __name__ == '__main__':
     # 创建包含两个子图的画布
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    position_list = [-80, -70, -60, -50, -40, -30, -20, -10, 10, 20, 30, 40, 50, 60, 70, 80]
+    position_list = [-80, -70, -60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80]
     all_phase_data = []
     # position_list = [-20, -10, 10, 20, 30]
     # 收集所有数据
     for pos in position_list:
-        filename = 'discrete_antenna_experiment/tx1d_20_tx1a_-20_tx2d_30_tx2a_{}.npz'.format(pos)
+        anchor_angle = 30
+        filename = 'discrete_antenna_experiment/tx1d_20_tx1a_{}_tx2d_30_tx2a_{}.npz'.format(anchor_angle, pos)
         # filename = 'discrete_antenna_experiment/angle_{}.npz'.format(pos)
         data_dict = load_data(filename)
         print(f"成功加载 {data_dict['num_triggers']} 次触发数据")
@@ -454,7 +460,7 @@ if __name__ == '__main__':
         phase12_list = []
         for i in range(len(data_dict['triggers'])):
             trigger = data_dict['triggers'][i]
-            phase12 = compensate_phase_offset(trigger, 0)
+            phase12 = compensate_phase_offset(trigger, anchor_angle)
             phase12_list.append(phase12)
         
         all_phase_data.append(phase12_list)
