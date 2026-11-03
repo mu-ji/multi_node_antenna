@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.mixture import GaussianMixture
+from matplotlib.lines import Line2D
 
 import cmath
 
@@ -248,9 +249,17 @@ def compensate_phase_offset(trigger_data, ref_position):
     print('interval:', interval)
     print('interval:', slope_12 * interval/16)
     anchor_phase = angle_to_phase(ref_position)
+    print(anchor_phase)
 
     target_phase_diff_12 = np.arctan2(np.sin(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16 - anchor_phase), np.cos(pkt2_phase_diff_12 - pkt1_phase_diff_12 - slope_12 * interval/16 - anchor_phase))
     # target_phase_diff_12 = np.arctan2(np.sin(pkt1_phase_diff_12 - pkt2_phase_diff_12), np.cos(pkt1_phase_diff_12 - pkt2_phase_diff_12))
+
+
+    #-----------------------------------
+    # local_phase_shift = np.arctan2(np.sin(pkt1_phase_diff_12 + anchor_phase + slope_12 * interval/16), np.cos(pkt1_phase_diff_12 + anchor_phase + slope_12 * interval/16))
+    # target_geo_phase_shift = np.arctan2(np.sin(pkt2_phase_diff_12 - local_phase_shift), np.cos(pkt2_phase_diff_12 - local_phase_shift))
+    # target_phase_diff_12 = target_geo_phase_shift
+    #-----------------------------------
 
     print(target_phase_diff_12)
     target_phase_diff_12_unwrap = unwrap_and_adjust(target_phase_diff_12)
@@ -374,21 +383,21 @@ def compensate_phase_offset(trigger_data, ref_position):
     # else:
     #     return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
 
-    rx1_amplitude = np.mean(np.sqrt(rx1_data['packet_2_I_data']**2 + rx1_data['packet_2_Q_data']**2))
-    rx2_amplitude = np.mean(np.sqrt(rx2_data['packet_2_I_data']**2 + rx2_data['packet_2_Q_data']**2))
+    # rx1_amplitude = np.mean(np.sqrt(rx1_data['packet_2_I_data']**2 + rx1_data['packet_2_Q_data']**2))
+    # rx2_amplitude = np.mean(np.sqrt(rx2_data['packet_2_I_data']**2 + rx2_data['packet_2_Q_data']**2))
 
-    if rx1_amplitude < rx2_amplitude:
-        if phase_12 > 0:
-            return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
-        else:
-            return phase_to_angle(np.arctan2(np.sin(phase_12), np.cos(phase_12)))
-    else:
-        if phase_12 < 0:
-            return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
-        else:
-            return phase_to_angle(np.arctan2(np.sin(phase_12), np.cos(phase_12)))
+    # if rx1_amplitude < rx2_amplitude:
+    #     if phase_12 > 0:
+    #         return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
+    #     else:
+    #         return phase_to_angle(np.arctan2(np.sin(phase_12), np.cos(phase_12)))
+    # else:
+    #     if phase_12 < 0:
+    #         return phase_to_angle(np.arctan2(np.sin(phase_12 - np.pi), np.cos(phase_12 - np.pi)))
+    #     else:
+    #         return phase_to_angle(np.arctan2(np.sin(phase_12), np.cos(phase_12)))
 
-    return phase_to_angle(phase_12)
+    return -phase_to_angle(phase_12)
 
 
 def filter_array(arr):
@@ -450,7 +459,7 @@ if __name__ == '__main__':
     # position_list = [-20, -10, 10, 20, 30]
     # 收集所有数据
     for pos in position_list:
-        anchor_angle = -20
+        anchor_angle = 20
         filename = 'discrete_antenna_experiment/tx1d_30_tx1a_{}_tx2d_40_tx2a_{}.npz'.format(anchor_angle, pos)
         # filename = 'discrete_antenna_experiment/angle_{}.npz'.format(pos)
         data_dict = load_data(filename)
@@ -507,6 +516,23 @@ if __name__ == '__main__':
     # 调整布局并显示
     plt.tight_layout()
     plt.show()
+
+    plt.figure()
+    vp = plt.violinplot(all_phase_data, positions=positions, showmeans=True)
+    plt.plot([0, 16], [-80, 80], 'r--', label='Ground truth')
+    # 设置小提琴图的x轴标签
+    plt.xticks(positions, labels=[f'{pos}' for pos in position_list], fontsize=10)
+    plt.ylim(-100, 100)
+    plt.yticks(np.arange(-100, 91, 10), fontsize=10) 
+    plt.xlabel('True angle (°)', fontsize=15)
+    plt.ylabel('Estimated angle (°)', fontsize=15)
+    plt.grid(True, alpha=0.3)
+    box_patch = mpatches.Patch(color='lightblue', alpha=0.7, label='Angle estimation')
+    line_patch = Line2D([0], [0], color='red', alpha=0.7, label='Ground truth', linestyle='--')
+    plt.legend(handles=[box_patch, line_patch], loc='upper left')
+    plt.savefig('double_peak.svg')
+    plt.show()
+
 
     print(all_phase_data[0])
     plt.figure()
